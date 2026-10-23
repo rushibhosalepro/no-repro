@@ -4,6 +4,13 @@
 
 Built for *No Hands: The Wispr Challenge*. Reporters can dictate issues and answers with Wispr Flow; the agent turns them into a structured, checkable report.
 
+## Who it's for
+
+- **Developers who fix the bugs.** Instead of guessing from "it just shows an error", you start from a reproduced bug: the real production error, the likely line, and the commit that broke it. The hours go into the fix, not into finding the bug.
+- **Maintainers who look after the repo's issues.** No more chasing reporters for steps, or closing real bugs as "can't reproduce". Each issue arrives already checked: reproduced, flaky, needs one answer from the reporter, or left for a human.
+
+On a real report ("Search is broken", one line), No Repro matched the Sentry error, reproduced it 3 of 3 times, named the line and found the commit that introduced it, with no developer time: [notely#2](https://github.com/rushibhosalepro/notely/issues/2).
+
 ## What it does
 
 1. **Clarity check.** Missing where / steps / expected / actual? It asks **one** question and re-runs when the reporter replies (`needs-info`). Subjective reports ("looks weird") are left to a human (`repro:out-of-scope`).
