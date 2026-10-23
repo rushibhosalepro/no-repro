@@ -2,6 +2,7 @@
 
 > **"No repro, no ticket."** A GitHub App that watches your repo's issues. For each new issue it checks the report is clear, points at the likely faulty lines, replays the bug in a real browser on **your own** GitHub Actions runner, and finds the commit that introduced it.
 
+**Try it live:** [p01--reprop--mzztlpyxqjgs.code.run](https://p01--reprop--mzztlpyxqjgs.code.run): open a demo project and use **Try it** to file a sample bug report from your own GitHub account. No sign-up needed.  
 **Demo video:** [youtu.be/0Uc7qXRXRbQ](https://youtu.be/0Uc7qXRXRbQ)
 
 Built for *No Hands: The Wispr Challenge*. Reporters can dictate issues and answers with Wispr Flow; the agent turns them into a structured, checkable report.
