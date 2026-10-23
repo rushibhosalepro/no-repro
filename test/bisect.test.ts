@@ -11,7 +11,7 @@ import { renderOutcome } from "../src/core/render.ts";
 import type { BugReport } from "../src/core/report.ts";
 import type { ActionsClient, RunResult } from "../src/repro/actions.ts";
 import { bisectState, chooseRange, type BisectRange, type HistoryHost } from "../src/repro/bisect.ts";
-import { finishReproduction, type ClearOutcome, type PendingRun } from "../src/repro/index.ts";
+import { failureSignature, finishReproduction, type ClearOutcome, type PendingRun } from "../src/repro/index.ts";
 import type { Plan } from "../src/repro/plan.ts";
 // @ts-expect-error plain JS module that runs on the GitHub Actions runner
 import { classify, firstBadFrom } from "../src/repro/runner.mjs";
@@ -87,6 +87,24 @@ describe("runner helpers", () => {
     expect(classify([run(true), run(false)])).toBe("bad");
     expect(classify([run(true, false)])).toBe("skip");
     expect(classify([])).toBe("skip");
+  });
+
+  // notely: the plan checks for "0 notes", a line that only exists from the commit after v1.0.0.
+  // At v1.0.0 the check fails for that reason alone, with no 500; that isn't the search crash.
+  test("with a failure signature, only that failure makes a commit bad", () => {
+    const signature = ["GET /api/notes returned 500"];
+    const crash = { ok: true, check: { passed: false, detail: "" }, errors: ["GET /api/notes returned 500", "console: Failed to load resource"] };
+    const missingText = { ok: true, check: { passed: false, detail: "" }, errors: [] };
+    expect(classify([crash, crash], signature)).toBe("bad");
+    expect(classify([missingText, missingText], signature)).toBe("good");
+    expect(classify([missingText, missingText])).toBe("bad"); // without a signature, any failed check counts
+  });
+
+  test("the signature is what every reproducing run had in common", () => {
+    const fail = (errors: string[]) => ({ ok: true, failedStep: null, error: null, check: { passed: false, detail: "" }, errors });
+    expect(failureSignature([fail(["GET /api/notes returned 500", "console: a"]), fail(["GET /api/notes returned 500", "console: b"])])).toEqual(["GET /api/notes returned 500"]);
+    expect(failureSignature([fail([]), fail([])])).toEqual([]); // a visual bug has no signature
+    expect(failureSignature([{ ok: true, failedStep: null, error: null, check: { passed: true, detail: "" }, errors: ["x"] }])).toEqual([]);
   });
 
   test("reads the first bad commit from real git bisect output", () => {

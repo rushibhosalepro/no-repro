@@ -14,7 +14,7 @@ import { bisectState, chooseRange, type BisectRange, type HistoryHost } from "./
 import type { Plan } from "./plan.ts";
 import { planReproduction, type PageSnapshot } from "./planner.ts";
 import type { ReproState } from "./state.ts";
-import { decideVerdict } from "./verdict.ts";
+import { decideVerdict, type RunOutcome } from "./verdict.ts";
 
 export type ClearOutcome = Extract<TriageOutcome, { status: "clear" }>;
 type Done = Extract<ReproState, { status: "done" }>;
@@ -94,13 +94,20 @@ export async function startReproduction(
   return { status: "running", plan: planned.plan, round, runUrl: null };
 }
 
+/** The errors every run that showed the bug had in common: how bisect tells this bug from other failures. */
+export function failureSignature(runs: RunOutcome[]): string[] {
+  const failing = runs.filter((r) => r.ok && r.check && !r.check.passed);
+  if (!failing.length) return [];
+  return [...new Set(failing[0]!.errors ?? [])].filter((e) => failing.every((r) => (r.errors ?? []).includes(e)));
+}
+
 /** After a confirmed reproduction: look for the commit that introduced the bug, if there's a range to search. */
-async function startBisect(pending: PendingRun, done: Done, deps: ReproDeps): Promise<Done> {
+async function startBisect(pending: PendingRun, done: Done, deps: ReproDeps, signature: string[] = []): Promise<Done> {
   if (!deps.history) return done;
   const range = await chooseRange(pending.outcome.report, pending.outcome.localization, deps.history, pending.outcome.evidence);
   if ("skip" in range) return { ...done, bisect: { status: "skipped", reason: range.skip } };
   const where = { owner: pending.owner, repo: pending.repo, issue: pending.issue, installationId: pending.installationId };
-  const job = { ...replayJob(pending.config, pending.plan), mode: "bisect", bisect: { good: range.good, bad: range.bad, runsPerCommit: 2, maxSteps: 12 } };
+  const job = { ...replayJob(pending.config, pending.plan), mode: "bisect", bisect: { good: range.good, bad: range.bad, runsPerCommit: 2, maxSteps: 12, signature } };
   const withBisect: Done = { ...done, bisect: { status: "running", range } };
   await dispatch(deps, where, { kind: "bisect", round: 1, plan: pending.plan, outcome: pending.outcome, config: pending.config, range, replay: withBisect }, job);
   return withBisect;
@@ -140,7 +147,7 @@ export async function finishReproduction(pending: PendingRun, runId: number, run
   const done: Done = { status: "done", plan: pending.plan, verdict, runUrl, baseUrl: pending.config.app.baseUrl };
   if (verdict.status === "reproduced" || verdict.status === "flaky") {
     try {
-      return await startBisect(pending, done, deps);
+      return await startBisect(pending, done, deps, failureSignature(result.runs));
     } catch (err) {
       return { ...done, bisect: { status: "skipped", reason: `couldn't start the search: ${err instanceof Error ? err.message : err}` } };
     }
