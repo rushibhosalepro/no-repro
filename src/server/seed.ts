@@ -36,7 +36,8 @@ export async function importSeed(store: Store, encoded: string): Promise<boolean
 export async function syncWebhookUrl(store: Store, url: string): Promise<boolean> {
   const app = await store.loadApp();
   if (!app || app.webhookUrl === url) return false;
-  await appOctokit(app).request("PATCH /app/hook/config", { url, content_type: "json", secret: app.webhookSecret });
+  // `data` sets the body directly: Octokit reads a top-level `url` option as the address to call.
+  await appOctokit(app).request("PATCH /app/hook/config", { data: { url, content_type: "json", secret: app.webhookSecret } });
   await store.saveApp({ ...app, webhookUrl: url });
   return true;
 }

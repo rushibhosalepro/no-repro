@@ -509,7 +509,13 @@ if (import.meta.main) {
   const store = fileStore(env.NOREPRO_DATA_DIR ?? ".norepro");
   if (env.NOREPRO_SEED && (await importSeed(store, env.NOREPRO_SEED))) console.log("Imported the GitHub App, Sentry installs and projects from NOREPRO_SEED");
   // On a host with a public URL, GitHub should deliver straight here, not to a local smee channel.
-  if (env.NOREPRO_PUBLIC_URL && (await syncWebhookUrl(store, `${publicUrl}/webhook`))) console.log(`GitHub App webhook now points at ${publicUrl}/webhook`);
+  if (env.NOREPRO_PUBLIC_URL) {
+    // A failure here shouldn't take the dashboard down; the webhook can also be changed in the GitHub App's settings.
+    await syncWebhookUrl(store, `${publicUrl}/webhook`).then(
+      (moved) => moved && console.log(`GitHub App webhook now points at ${publicUrl}/webhook`),
+      (err) => console.error(`Couldn't point the GitHub App webhook at ${publicUrl}/webhook: ${err instanceof Error ? err.message : err}`),
+    );
+  }
   const webhookUrl = await resolveWebhookUrl(store, env, publicUrl);
 
   const server = createServer({ store, publicUrl, webhookUrl, env });
