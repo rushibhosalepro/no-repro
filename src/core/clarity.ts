@@ -1,4 +1,5 @@
 import type { NoReproConfig } from "./config.ts";
+import type { Evidence } from "../evidence/index.ts";
 import type { StructuredModel } from "./model.ts";
 import { SYSTEM_PROMPT, userPrompt } from "./prompt.ts";
 import { BugReportSchema, type BugReport, type MissingField, type TriageOutcome } from "./report.ts";
@@ -11,11 +12,11 @@ export interface IssueThread {
 }
 
 /** Anything that can turn an issue thread into a structured report. Swapped for a fake in tests. */
-export type ReportExtractor = (thread: IssueThread, config: NoReproConfig) => Promise<BugReport>;
+export type ReportExtractor = (thread: IssueThread, config: NoReproConfig, evidence?: Evidence | null) => Promise<BugReport>;
 
 export function reportExtractor(model: StructuredModel): ReportExtractor {
-  return (thread, config) =>
-    model.generate({ name: "bug_report", system: SYSTEM_PROMPT, user: userPrompt(thread, config), schema: BugReportSchema });
+  return (thread, config, evidence) =>
+    model.generate({ name: "bug_report", system: SYSTEM_PROMPT, user: userPrompt(thread, config, evidence), schema: BugReportSchema });
 }
 
 const QUESTION_FALLBACKS: Record<MissingField, string> = {
@@ -53,6 +54,8 @@ export async function checkClarity(
   thread: IssueThread,
   config: NoReproConfig,
   extract: ReportExtractor,
+  evidence?: Evidence | null,
 ): Promise<TriageOutcome> {
-  return decide(await extract(thread, config));
+  const outcome = decide(await extract(thread, config, evidence));
+  return evidence ? { ...outcome, evidence } : outcome;
 }

@@ -13,6 +13,8 @@ export interface GhIssue {
   user: GhUser | null;
   labels: Array<{ name?: string } | string>;
   pull_request?: unknown;
+  html_url?: string;
+  created_at?: string;
   state?: string;
 }
 export interface GhComment {

@@ -67,6 +67,7 @@ export function installationOctokit(app: AppCredentials, installationId: number)
 export interface ConnectedRepo {
   fullName: string;
   account: string;
+  installationId: number;
 }
 
 /** Every repo the app is installed on, for the dashboard. */
@@ -78,7 +79,7 @@ export async function listConnectedRepos(app: AppCredentials): Promise<Connected
     const inside = installationOctokit(app, inst.id);
     const list = await inside.paginate(inside.apps.listReposAccessibleToInstallation, { per_page: 100 });
     const account = inst.account && "login" in inst.account ? inst.account.login : "unknown";
-    for (const r of list) repos.push({ fullName: r.full_name, account });
+    for (const r of list) repos.push({ fullName: r.full_name, account, installationId: inst.id });
   }
   return repos;
 }

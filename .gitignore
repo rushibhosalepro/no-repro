@@ -3,3 +3,9 @@ node_modules/
 *.log
 test-results/
 .norepro/
+
+# Local notes and scratch output, not part of the project
+docs/STORY.md
+plan.md
+no-repro-discovery.md
+path/

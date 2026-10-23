@@ -28,7 +28,7 @@ function server(initial: AppCredentials | null = app) {
     webhookUrl: "https://smee.io/abc",
     env: {},
     processIssue: async (job) => void jobs.push(job),
-    listRepos: async () => [{ fullName: "rushi/shoplite", account: "rushi" }],
+    listRepos: async () => [{ fullName: "rushi/shoplite", account: "rushi", installationId: 42 }],
     fetchImpl: (async () =>
       Response.json({ id: 9, slug: "no-repro-new", name: "No Repro new", html_url: "https://github.com/apps/no-repro-new", client_id: "c", client_secret: "s", webhook_secret: "w", pem: "k" })) as unknown as typeof fetch,
     log: () => {},
@@ -89,14 +89,13 @@ describe("webhook", () => {
 });
 
 describe("pages", () => {
-  test("before setup, home still shows Connect; it leads to /setup, which posts the manifest to GitHub", async () => {
+  test("before setup, home offers the one-time setup; it posts the manifest to GitHub", async () => {
     const s = server(null);
     const home = await s.fetch(new Request("http://localhost:8787/"));
     expect(home.status).toBe(200);
     const page = await home.text();
-    expect(page).toContain("Connect a repo");
+    expect(page).toContain("Welcome to No Repro");
     expect(page).toContain('href="http://localhost:8787/setup"');
-    expect(page).toContain("No repos connected yet.");
     const html = await (await s.fetch(new Request("http://localhost:8787/setup"))).text();
     expect(html).toContain("https://github.com/settings/apps/new?state=");
     expect(html).toContain("&quot;issues&quot;:&quot;write&quot;");
@@ -109,11 +108,16 @@ describe("pages", () => {
     expect(await (await s.fetch(new Request("http://x/setup?key=k"))).text()).toContain("settings/apps/new");
   });
 
-  test("after setup the home page shows the install button and connected repos", async () => {
+  test("after setup, home lists projects and offers New project", async () => {
     const html = await (await server().fetch(new Request("http://localhost:8787/"))).text();
+    expect(html).toContain("<h1>Projects</h1>");
+    expect(html).toContain('href="/projects/new"');
+  });
+
+  test("the repo step lists connected repos and links to GitHub to add more", async () => {
+    const html = await (await server().fetch(new Request("http://localhost:8787/projects/new?name=Shop&step=repo"))).text();
+    expect(html).toContain('value="rushi/shoplite"');
     expect(html).toContain("https://github.com/apps/no-repro-ab12/installations/new");
-    expect(html).toContain("Connect another repo");
-    expect(html).toContain("rushi/shoplite");
   });
 
   test("setup callback needs the state we issued, then saves the app", async () => {

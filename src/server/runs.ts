@@ -7,6 +7,7 @@ import { GitHubActions } from "../repro/actions.ts";
 import { finishReproduction, type RunStore } from "../repro/index.ts";
 import { parseRunTitle, RUN_WORKFLOW_PATH } from "../repro/workflow.ts";
 import { installationOctokit } from "./app.ts";
+import { checkRecordFrom, type CheckStore } from "./projects.ts";
 import type { AppCredentials } from "./store.ts";
 
 export interface RunEventJob {
@@ -42,7 +43,13 @@ export function runEventFrom(payload: any, app: AppCredentials): RunEventJob | n
   };
 }
 
-export async function defaultProcessRun(job: RunEventJob, runs: RunStore, env: Record<string, string | undefined>, log: (m: string) => void): Promise<void> {
+export async function defaultProcessRun(
+  job: RunEventJob,
+  runs: RunStore,
+  env: Record<string, string | undefined>,
+  log: (m: string) => void,
+  checks?: CheckStore,
+): Promise<void> {
   const pending = await runs.load(job.ref);
   // Unknown ref: a stale run, or one someone started by hand. Only act on runs we dispatched for this repo and issue.
   if (!pending || pending.owner !== job.owner || pending.repo !== job.repo || pending.issue !== job.issue) return;
@@ -75,6 +82,9 @@ export async function defaultProcessRun(job: RunEventJob, runs: RunStore, env: R
   const repro = await finishReproduction(pending, job.runId, job.runUrl, deps);
   const outcome = { ...pending.outcome, repro };
   await handle.upsertComment(renderOutcome(outcome, { runs: state.runs, status: "clear" }));
+  // Keep the project page in step with the comment.
+  const prev = await checks?.get(`${job.owner}/${job.repo}`, pending.issue);
+  if (checks && prev) await checks.record(checkRecordFrom(outcome, prev));
   if (repro.status === "done") {
     await handle.setStatusLabel(REPRO_LABELS[repro.verdict.status], await handle.getIssue());
     const b = repro.bisect;

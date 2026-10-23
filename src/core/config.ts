@@ -48,6 +48,13 @@ export const ConfigSchema = z.object({
       env: z.array(z.string()).default([]),
     })
     .default({ install: "npm ci", env: [] }),
+  // Production evidence. The Sentry organization must have installed No Repro's Sentry integration.
+  sentry: z
+    .object({
+      org: z.string(),
+      project: z.string(),
+    })
+    .optional(),
   // For clear reports, read the repo source to point at the likely faulty lines and the commit behind them.
   localize: z.boolean().default(true),
   // Only triage issues carrying one of these labels. Empty = triage every new issue.

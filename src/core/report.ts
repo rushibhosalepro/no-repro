@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Evidence } from "../evidence/index.ts";
 import type { ReproState } from "../repro/state.ts";
 import type { Localization } from "./localize.ts";
 
@@ -61,10 +62,14 @@ export type BugReport = z.infer<typeof BugReportSchema>;
 
 export type MissingField = "page" | "steps" | "expected" | "actual";
 
-export type TriageOutcome =
+export type TriageOutcome = (
   | { status: "needs-info"; report: BugReport; missing: MissingField[]; question: string }
   | { status: "out-of-scope"; report: BugReport; reason: string }
   // "clear" is the hand-off point to locating the bug in the code (and, next, reproduction).
-  | { status: "clear"; report: BugReport; localization?: Localization; localizeError?: string; repro?: ReproState };
+  | { status: "clear"; report: BugReport; localization?: Localization; localizeError?: string; repro?: ReproState }
+) & {
+  /** The matching production error, when the repo has Sentry connected. */
+  evidence?: Evidence;
+};
 
 export type TriageStatus = TriageOutcome["status"];

@@ -13,6 +13,27 @@ Built for *No Hands: The Wispr Challenge*. Reporters can dictate issues and answ
 
 One comment per issue, edited in place: verdict, summary table, run results, introduced-in, likely cause, links, conclusion. It never closes, edits or deletes issues, and **No Repro never runs your code itself**: the plan is data (clicks, typing, one check) and only your runner executes your app.
 
+### Production evidence (Sentry)
+
+Click **Connect Sentry** on the No Repro home page, accept in Sentry, then point the repo at its project:
+
+```yaml
+sentry:
+  org: acme          # the Sentry organization slug
+  project: shoplite  # the project slug
+```
+
+Each issue is matched to its Sentry issue (a pasted Sentry link wins; otherwise the model picks from recent issues, or none). The match feeds every step:
+- **Clarity:** fills in what the reporter left out.
+- **Likely cause:** always reads the files in the stack trace.
+- **Plan:** follows the real user's breadcrumbs.
+- **Bisect:** starts from the release before Sentry first saw it.
+- **Comment:** adds a **Production** row (events, users, first-seen release) and a **View in Sentry** link.
+
+A Sentry outage never blocks triage.
+
+Host setup (once): register a Sentry **public integration** with redirect URL `<server>/sentry/callback`, *Verify Install* on, and read access to Project, Issue & Event and Organization. Put `SENTRY_CLIENT_ID`, `SENTRY_CLIENT_SECRET` and `SENTRY_INTEGRATION_SLUG` in `.env`.
+
 ### Enable reproduction on a repo
 
 Add `.github/workflows/norepro.yml` and `.github/norepro/runner.mjs` (generate both with `bun scripts/enable-runs.ts <checkout>`), and describe how to start the app:

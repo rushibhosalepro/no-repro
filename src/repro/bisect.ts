@@ -2,6 +2,7 @@
 // actual `git bisect` (see runner.mjs); this module picks the range and reads the result.
 import type { Localization } from "../core/localize.ts";
 import type { BugReport } from "../core/report.ts";
+import type { Evidence } from "../evidence/index.ts";
 
 export interface CommitRef {
   sha: string;
@@ -58,11 +59,17 @@ const MAX_COMMITS = 500; // ~9 bisect steps; beyond that a run would take too lo
 /**
  * Pick a commit believed to be free of the bug, most trustworthy first:
  *   1. the version the reporter says worked ("works in 4.22.0")
+ *   1b. the release before Sentry first saw the error
  *   2. the newest release tag before the current commit
  *   3. the commit just before the suspected lines last changed
  * Returns null when there's no sensible range (e.g. the lines have been there since the file was created).
  */
-export async function chooseRange(report: BugReport, localization: Localization | undefined, history: HistoryHost): Promise<BisectRange | { skip: string }> {
+export async function chooseRange(
+  report: BugReport,
+  localization: Localization | undefined,
+  history: HistoryHost,
+  evidence?: Evidence | null,
+): Promise<BisectRange | { skip: string }> {
   const bad = localization?.sha;
   if (!bad) return { skip: "the code wasn't read, so there's no commit to start from" };
 
@@ -71,6 +78,13 @@ export async function chooseRange(report: BugReport, localization: Localization 
     const v = report.lastWorkingVersion.trim();
     const sha = (await history.resolveRef(v)) ?? (await history.resolveRef(`v${v.replace(/^v/i, "")}`));
     candidates.push({ sha, label: `${v}, which the reporter says worked` });
+  }
+  const firstSeen = evidence?.issue.firstRelease;
+  if (firstSeen) {
+    // Sentry first saw it in this release, so the release before it is the best guess for "good".
+    const seenAt = (await history.resolveRef(firstSeen)) ?? (await history.resolveRef(`v${firstSeen.replace(/^v/i, "")}`));
+    const before = seenAt ? await history.latestTagBefore(seenAt) : null;
+    if (before) candidates.push({ sha: before.sha, label: `${before.name}, the release before Sentry first saw this in ${firstSeen}` });
   }
   const tag = await history.latestTagBefore(bad);
   if (tag) candidates.push({ sha: tag.sha, label: `${tag.name}, the latest release before this commit` });

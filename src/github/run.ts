@@ -1,4 +1,5 @@
-import { checkClarity, type ReportExtractor } from "../core/clarity.ts";
+import { checkClarity, type IssueThread, type ReportExtractor } from "../core/clarity.ts";
+import type { Evidence } from "../evidence/index.ts";
 import type { NoReproConfig } from "../core/config.ts";
 import type { Localization } from "../core/localize.ts";
 import type { BugReport, TriageOutcome } from "../core/report.ts";
@@ -18,7 +19,9 @@ type Log = (msg: string) => void;
 /** What the agent can do. `locate` is optional: without it, clear reports stop at the summary. */
 export interface Agent {
   extract: ReportExtractor;
-  locate?: (report: BugReport) => Promise<Localization>;
+  /** Find the matching production error (Sentry). Optional; a failure never blocks triage. */
+  evidence?: (thread: IssueThread) => Promise<Evidence | null>;
+  locate?: (report: BugReport, evidence?: Evidence | null) => Promise<Localization>;
   /** Start a browser reproduction on the repo's own GitHub Actions runner. Finishes later via workflow_run. */
   reproduce?: (outcome: ClearOutcome) => Promise<ReproState>;
 }
@@ -51,7 +54,15 @@ export async function runOnIssue(
   try {
     const issue = await handle.getIssue(); // fresh copy: the body may have been edited since the event fired
     const thread = await handle.loadThread(issue);
-    const outcome = await checkClarity(thread, config, agent.extract);
+    let evidence: Evidence | null = null;
+    if (agent.evidence) {
+      evidence = await agent.evidence(thread).catch((err) => {
+        log(`#${handle.number}: evidence lookup failed: ${err instanceof Error ? err.message : err}`);
+        return null;
+      });
+      if (evidence) log(`#${handle.number}: matched Sentry ${evidence.issue.shortId} (${evidence.matchedBy})`);
+    }
+    const outcome = await checkClarity(thread, config, agent.extract, evidence);
     const done: AgentState = { runs: state.runs, status: outcome.status };
     await handle.setStatusLabel(STATUS_LABELS[outcome.status], issue);
 
@@ -59,7 +70,7 @@ export async function runOnIssue(
       // Show the clear verdict straight away, then fill in the likely cause.
       await handle.upsertComment(renderScanning(outcome, done));
       try {
-        outcome.localization = await agent.locate(outcome.report);
+        outcome.localization = await agent.locate(outcome.report, outcome.evidence);
         const top = outcome.localization.suspects[0];
         log(`#${handle.number}: located ${top ? `${top.path}:${top.startLine}-${top.endLine} (${top.confidence})` : "nothing"}`);
       } catch (err) {

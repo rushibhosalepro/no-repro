@@ -87,7 +87,7 @@ export async function startReproduction(
 ): Promise<ReproState> {
   if (!(await deps.actions.enabled())) return { status: "disabled" };
 
-  const planned = await planReproduction(outcome.report, outcome.localization, deps.host, deps.model, config, retry);
+  const planned = await planReproduction(outcome.report, outcome.localization, deps.host, deps.model, config, retry, outcome.evidence);
   if (!planned.ok) return { status: "not-feasible", reason: planned.reason };
 
   await dispatch(deps, where, { kind: "replay", round, plan: planned.plan, outcome, config }, replayJob(config, planned.plan));
@@ -97,7 +97,7 @@ export async function startReproduction(
 /** After a confirmed reproduction: look for the commit that introduced the bug, if there's a range to search. */
 async function startBisect(pending: PendingRun, done: Done, deps: ReproDeps): Promise<Done> {
   if (!deps.history) return done;
-  const range = await chooseRange(pending.outcome.report, pending.outcome.localization, deps.history);
+  const range = await chooseRange(pending.outcome.report, pending.outcome.localization, deps.history, pending.outcome.evidence);
   if ("skip" in range) return { ...done, bisect: { status: "skipped", reason: range.skip } };
   const where = { owner: pending.owner, repo: pending.repo, issue: pending.issue, installationId: pending.installationId };
   const job = { ...replayJob(pending.config, pending.plan), mode: "bisect", bisect: { good: range.good, bad: range.bad, runsPerCommit: 2, maxSteps: 12 } };

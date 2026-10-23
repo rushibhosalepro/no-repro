@@ -154,3 +154,22 @@ test("hitting the run limit leaves the last verdict in place", async () => {
   expect(result).toMatchObject({ ran: false });
   expect(record.comments).toEqual([]);
 });
+
+describe("runOnIssue with production evidence", () => {
+  const evidence = { source: "sentry", matchedBy: "search", issue: { id: "1", shortId: "SHOP-1", title: "t", permalink: "https://acme.sentry.io/issues/1/", events: 3, users: 2, firstSeen: "", lastSeen: "", firstRelease: null }, error: null, frames: [], breadcrumbs: [], url: null, browser: null, os: null, release: null, environment: null } as const;
+
+  test("evidence is handed to the extractor and shown in the comment", async () => {
+    const { handle, record } = fakeHandle();
+    let seen: unknown = null;
+    await runOnIssue(handle, opened, config, { evidence: async () => evidence as any, extract: async (_t, _c, e) => ((seen = e), vague) }, () => {});
+    expect(seen).toBe(evidence);
+    expect(record.comments.at(-1)).toContain("| Production | 3 events · 2 users");
+  });
+
+  test("a Sentry outage doesn't block triage", async () => {
+    const { handle, record } = fakeHandle();
+    const result = await runOnIssue(handle, opened, config, { evidence: async () => { throw new Error("Sentry 503"); }, extract: async () => vague }, () => {});
+    expect(result).toMatchObject({ ran: true, outcome: { status: "needs-info" } });
+    expect(record.comments.at(-1)).not.toContain("Production");
+  });
+});

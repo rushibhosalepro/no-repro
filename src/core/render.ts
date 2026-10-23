@@ -2,6 +2,7 @@
 // happened, why it may have happened, and whether to trust it, in under 30 seconds.
 // Layout: verdict → summary table → run results → likely cause → links → conclusion.
 // Logs and step details appear only when they explain an unusual result.
+import type { Evidence } from "../evidence/index.ts";
 import type { Suspect } from "./localize.ts";
 import { describeStep } from "../repro/plan.ts";
 import type { ReproState } from "../repro/state.ts";
@@ -145,6 +146,15 @@ function environment(outcome: Clear | TriageOutcome): string {
   return [device, r.environment.browser ? cell(r.environment.browser) : ""].filter(Boolean).join(", ");
 }
 
+/** "37 events · 12 users · first seen in 1.4.0 · `SHOP-1A`" */
+function production(e: Evidence): string {
+  const parts = [plural(e.issue.events, "event"), plural(e.issue.users, "user")];
+  if (e.issue.firstRelease) parts.push(`first seen in ${cell(e.issue.firstRelease)}`);
+  else if (e.issue.firstSeen) parts.push(`first seen ${shortDate(e.issue.firstSeen)}`);
+  parts.push(`\`${cell(e.issue.shortId)}\``);
+  return parts.join(" · ");
+}
+
 function summary(outcome: TriageOutcome): string {
   const r = outcome.report;
   const missing = "—";
@@ -156,6 +166,7 @@ function summary(outcome: TriageOutcome): string {
   const env = environment(outcome);
   if (env) rows.push(["Environment", env]);
   if (r.testValues.length) rows.push(["Exact values", r.testValues.map(exact).join(" ")]);
+  if (outcome.evidence) rows.push(["Production", production(outcome.evidence)]);
   const sha = outcome.status === "clear" ? outcome.localization?.sha : undefined;
   if (sha) rows.push(["Commit", `\`${sha.slice(0, 7)}\``]);
   return table(["Field", "Result"], rows);
@@ -194,6 +205,7 @@ function links(outcome: Clear): string {
   const out: string[] = [];
   const top = outcome.localization?.suspects[0];
   if (top?.link) out.push(`[View source code](${top.link})`);
+  if (outcome.evidence) out.push(`[View in Sentry](${outcome.evidence.issue.permalink})`);
   const repro = outcome.repro;
   if (repro && "runUrl" in repro && repro.runUrl) out.push(`[View test run](${repro.runUrl})`);
   if (repro?.status === "done" && repro.bisectRunUrl) out.push(`[View bisect run](${repro.bisectRunUrl})`);
