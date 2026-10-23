@@ -1,0 +1,12 @@
+node_modules
+.norepro
+.env
+.git
+docs
+path
+test
+assets
+examples
+demo
+scripts
+*.md
